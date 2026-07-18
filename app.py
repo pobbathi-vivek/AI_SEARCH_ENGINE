@@ -1,10 +1,13 @@
 import os
 import sqlite3
 import streamlit as st
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    Docx2txtLoader,
+)
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 from langchain.tools import tool
 from langchain.agents import create_agent
@@ -41,7 +44,7 @@ VECTOR_DB_DIR = "chroma_db"
 # ==========================================
 
 @tool
-def query_uploaded_pdfs(query: str) -> str:
+def query_uploaded_docs(query: str) -> str:
     """Useful when you need to answer questions based on the uploaded PDF documents. 
     Input must be a simple text query string."""
     if not os.path.exists(VECTOR_DB_DIR) or not os.listdir(VECTOR_DB_DIR):
@@ -115,26 +118,42 @@ def get_database_schema(dummy_arg: str = "") -> str:
     except Exception as e:
         return f"Failed to retrieve database schema: {str(e)}"
 
-tools = [query_uploaded_pdfs, internet_search, query_company_database, get_database_schema]
+tools = [query_uploaded_docs, internet_search, query_company_database, get_database_schema]
 
 # ==========================================
 # 3. STREAMLIT SIDEBAR - PDF PROCESSING
 # ==========================================
 st.sidebar.header("📁 Upload Documents")
-uploaded_files = st.sidebar.file_uploader("Upload PDFs for analysis", type=["pdf"], accept_multiple_files=True)
-
+uploaded_files = st.sidebar.file_uploader(
+    "Upload PDF or DOCX files",
+    type=["pdf", "docx"],
+    accept_multiple_files=True
+)
 if st.sidebar.button("Process Documents") and uploaded_files:
     with st.spinner("Processing and indexing PDFs locally..."):
         all_docs = []
         os.makedirs("temp_pdfs", exist_ok=True)
         
         for uploaded_file in uploaded_files:
+
             temp_path = os.path.join("temp_pdfs", uploaded_file.name)
+
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            
-            loader = PyPDFLoader(temp_path)
+
+            # PDF
+            if uploaded_file.name.lower().endswith(".pdf"):
+                loader = PyPDFLoader(temp_path)
+
+            # DOCX
+            elif uploaded_file.name.lower().endswith(".docx"):
+                loader = Docx2txtLoader(temp_path)
+
+            else:
+                continue
+
             all_docs.extend(loader.load())
+
             os.remove(temp_path)
             
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -142,8 +161,9 @@ if st.sidebar.button("Process Documents") and uploaded_files:
         
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory=VECTOR_DB_DIR)
-        st.sidebar.success(f"Indexed {len(uploaded_files)} PDF(s) successfully!")
-
+        st.sidebar.success(
+            f"Indexed {len(uploaded_files)} document(s) successfully!"
+        )
 # ==========================================
 # 4. AGENT & CHAT INTERFACE
 # ==========================================
