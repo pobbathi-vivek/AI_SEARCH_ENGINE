@@ -10,3 +10,4 @@ langsmith
 docx2txt
 pypdf
 langchain-huggingface
+sentence-transformers
