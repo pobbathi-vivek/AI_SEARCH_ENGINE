@@ -5,7 +5,8 @@ langchain-community
 langchain-groq
 langchain-tavily
 langchain-chroma
-pypdf
-docx2text
 python-dotenv
 langsmith
+docx2txt
+pypdf
+langchain-huggingface
