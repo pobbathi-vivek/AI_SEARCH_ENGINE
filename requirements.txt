@@ -4,5 +4,6 @@ langchain-classic
 langchain-community
 langchain-groq
 langchain-tavily
+langchain-chroma
 python-dotenv
 langsmith
